@@ -1,0 +1,24 @@
+{
+  "name": "pepperonas-path-links",
+  "owner": {
+    "name": "Martin Pfeffer",
+    "email": "martin.pfeffer@celox.io",
+    "url": "https://celox.io"
+  },
+  "metadata": {
+    "description": "Claude Code mods by Martin Pfeffer (celox.io)"
+  },
+  "plugins": [
+    {
+      "name": "path-links",
+      "source": "./",
+      "description": "Clickable paths in Claude Code replies: click a folder to open it in your file manager, click the file name to open the file",
+      "version": "0.1.0",
+      "author": { "name": "Martin Pfeffer", "url": "https://celox.io" },
+      "homepage": "https://github.com/pepperonas/path-links",
+      "license": "MIT",
+      "category": "productivity",
+      "tags": ["mod", "paths", "links", "finder", "file-manager", "ui"]
+    }
+  ]
+}

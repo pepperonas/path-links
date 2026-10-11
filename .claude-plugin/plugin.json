@@ -1,0 +1,34 @@
+{
+  "name": "path-links",
+  "version": "0.1.0",
+  "description": "Clickable paths in Claude Code replies: click a folder to open it in your file manager, click the file name to open the file",
+  "userConfig": {
+    "mode": {
+      "type": "string",
+      "title": "Links",
+      "description": "segments: every folder and the file are links · file: the whole path is one link · off",
+      "default": "segments"
+    },
+    "codeBlocks": {
+      "type": "boolean",
+      "title": "Code blocks",
+      "description": "Paths inside a code block get a clickable line under the block; the block itself stays copyable",
+      "default": true
+    },
+    "relative": {
+      "type": "boolean",
+      "title": "Relative paths",
+      "description": "Link relative paths like hooks/register.tsx, resolved against the working directory",
+      "default": true
+    }
+  },
+  "author": {
+    "name": "Martin Pfeffer",
+    "email": "martin.pfeffer@celox.io",
+    "url": "https://celox.io"
+  },
+  "homepage": "https://github.com/pepperonas/path-links",
+  "repository": "https://github.com/pepperonas/path-links",
+  "license": "MIT",
+  "keywords": ["mod", "function-hooks", "ui", "paths", "links", "finder", "file-manager"]
+}

@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- path-links listing icon: a path whose segments are links, the folder
+       one highlighted. Rendered to .claude-plugin/icon.png (1024 px) by
+       `npm run screenshots`. -->
+  <rect width="1024" height="1024" fill="#0d1117"/>
+  <!-- folder -->
+  <path d="M 200 300 h 190 l 60 60 h 374 a 30 30 0 0 1 30 30 v 330 a 30 30 0 0 1 -30 30 h -624 a 30 30 0 0 1 -30 -30 v -390 a 30 30 0 0 1 30 -30 z" fill="#1f6feb"/>
+  <path d="M 170 420 h 684 v 300 a 30 30 0 0 1 -30 30 h -624 a 30 30 0 0 1 -30 -30 z" fill="#388bfd"/>
+  <!-- the path, as segments with underlines -->
+  <rect x="250" y="520" width="120" height="22" rx="11" fill="#e6edf3"/>
+  <rect x="250" y="566" width="120" height="10" rx="5" fill="#0d1117" opacity=".55"/>
+  <rect x="400" y="520" width="12" height="22" rx="6" fill="#e6edf3" opacity=".7"/>
+  <rect x="440" y="520" width="150" height="22" rx="11" fill="#e6edf3"/>
+  <rect x="440" y="566" width="150" height="10" rx="5" fill="#0d1117" opacity=".55"/>
+  <rect x="620" y="520" width="12" height="22" rx="6" fill="#e6edf3" opacity=".7"/>
+  <rect x="660" y="520" width="120" height="22" rx="11" fill="#f2cc60"/>
+  <rect x="660" y="566" width="120" height="10" rx="5" fill="#f2cc60"/>
+  <!-- the pointer -->
+  <path d="M 700 600 l 0 170 l 44 -42 l 32 72 l 34 -15 l -32 -70 l 60 -4 z" fill="#ffffff" stroke="#0d1117" stroke-width="14" stroke-linejoin="round"/>
+</svg>
