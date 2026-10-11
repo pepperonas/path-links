@@ -15,8 +15,8 @@
 <h3>👉 <code>/plugin marketplace add pepperonas/path-links</code> · <code>/plugin install path-links@pepperonas-path-links</code> — that's it.</h3>
 
 [![version](https://img.shields.io/badge/version-0.1.0-7B4DFF?style=for-the-badge&logo=anthropic&logoColor=white)](CHANGELOG.md)
-[![node tests](https://img.shields.io/badge/node%20tests-38-2E9E5B?style=for-the-badge&logo=nodedotjs&logoColor=white)](tests)
-[![engine tests](https://img.shields.io/badge/engine%20tests-6-2E9E5B?style=for-the-badge&logo=anthropic&logoColor=white)](hooks)
+[![node tests](https://img.shields.io/badge/node%20tests-39-2E9E5B?style=for-the-badge&logo=nodedotjs&logoColor=white)](tests)
+[![engine tests](https://img.shields.io/badge/engine%20tests-7-2E9E5B?style=for-the-badge&logo=anthropic&logoColor=white)](hooks)
 [![lines of code](https://img.shields.io/badge/lines%20of%20code-0.4k-4B6BDF?style=for-the-badge&logo=typescript&logoColor=white)](hooks)
 
 [![CI](https://img.shields.io/github/actions/workflow/status/pepperonas/path-links/ci.yml?branch=main&label=CI&logo=github)](https://github.com/pepperonas/path-links/actions/workflows/ci.yml)
@@ -185,7 +185,7 @@ The stored message is never changed — only its drawing — so copying, `ctrl+o
 
 - **No network.** The mod makes no request of any kind.
 - **No processes.** It never runs `open` itself; clicking is between you and your terminal.
-- **Never touches network locations.** Paths under automounter roots (`/net`, `/Network`, `/home`, `/afs`, `/misc`) are not looked up at all — a stat there could mount a share, and reply text must never make your machine contact a host. A lookup that takes longer than 300 ms counts as missing, so a stalled mount can't freeze the transcript. Spellings with a `..` segment are not looked up either (text and kernel can disagree about where they land through symlinks), and the check ignores case, as macOS file systems do.
+- **Never touches network locations.** A mere `stat` can reach the network through an automounter (`/net`, `/Network`, macOS's `/home`) or a mounted share, and reply text must never make your machine contact a host. So lookups use an **allow-list**: only paths in your home folder, the working directory and local system roots (`/etc`, `/tmp`, `/usr`, `/opt`, `/Applications`, `/Library`, …) are looked up; `/Volumes`, `/mnt`, `/media`, `/System/Volumes/…` and everything else never are. Case is ignored (macOS file systems do too), spellings with `..` are skipped, and a path whose symlink leads out of the allowed roots is not linked. A lookup slower than 300 ms counts as missing, so a stalled mount can't freeze the transcript. The one thing a mod can't rule out: a symlink *you* created inside your home folder that points at a network share is followed by the lookup, as by every other tool.
 - **Reads only metadata.** It asks whether a path exists and whether it is a file or a folder — never a file's contents.
 - **No logs, no telemetry.** Its only stored value is your `/path-links` settings.
 

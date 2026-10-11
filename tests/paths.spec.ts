@@ -186,3 +186,14 @@ test('automounter roots are never looked up, so a reply cannot make the machine 
 test('spellings with a .. segment are never looked up: text and kernel may disagree where they land', () => {
   assert.deepEqual(probes('see /tmp/../net/host/x and ../x/y.md and /etc/hosts', CTX, DEFAULT_PREFS).filter(p => p !== '/etc/hosts'), [])
 })
+
+test('only the home folder, the working directory and local system roots are looked up', () => {
+  const t = [
+    '/System/Volumes/Data/home/u/x', '/Volumes/share/x', '/mnt/nfs/x', '/media/usb/x', '/proc/1/x',
+    '/private/var/automount/Network/x', '/Users/Shared/.autofs/x', '/srv/x', '/NET/host/x',
+  ].map(p => `see ${p} now`).join('\n')
+  assert.deepEqual(probes(t, CTX, DEFAULT_PREFS), [])
+  const ok = probes('see /etc/hosts and /Users/me/a.md and /usr/local/x and /tmp/y', CTX, DEFAULT_PREFS)
+  for (const p of ['/etc/hosts', '/Users/me/a.md', '/usr/local/x', '/tmp/y']) assert.ok(ok.includes(p), p)
+  assert.ok(probes('see /srv/app/x.md', { ...CTX, cwd: '/srv/app' }, DEFAULT_PREFS).includes('/srv/app/x.md'), 'the working directory is allowed wherever it is')
+})

@@ -10,7 +10,7 @@ const FS: Record<string, 'file' | 'dir'> = {
 }
 
 /** Stand-in for the engine beneath the plugin: draws the reply's text as markdown. */
-function engine(on: any) {
+function engine(on: any, real = (p: string) => p) {
   mock.clock(on)
   mock.store(on)
   const stats: string[] = []
@@ -26,7 +26,7 @@ function engine(on: any) {
     stats.push(e.path)
     const kind = FS[e.path]
     if (!kind) throw new Error(`ENOENT: ${e.path}`)
-    return { value: { kind, size: 0, mtimeMs: 0, isLink: false } }
+    return { value: { kind, size: 0, mtimeMs: 0, isLink: false, realPath: real(e.path) } }
   })
   return { stats }
 }
@@ -68,6 +68,13 @@ test('/path-links off turns the links off, segments brings them back', async ($,
   expect(await drawn(await reply($, FILE, 'terminal'))).toBe(FILE)
   await ($ as any).command.run({ command: 'path-links', args: 'segments' })
   expect(await drawn(await reply($, FILE, 'terminal'))).toContain('file://')
+})
+
+test('a path whose link leads out of the allowed roots is not linked', async ($, on) => {
+  engine(on, p => `/Volumes/share${p}`)
+  await start($)
+  const text = 'see hooks/register.tsx'
+  expect(await drawn(await reply($, text, 'terminal'))).toBe(text)
 })
 
 test('a second drawing of the same reply stats nothing again', async ($, on) => {

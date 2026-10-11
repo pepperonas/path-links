@@ -1,6 +1,6 @@
 import type { EngineInterface, PluginOptions, Register } from 'claude-code'
 
-import { DEFAULT_PREFS, probes, rewrite } from './paths'
+import { DEFAULT_PREFS, mayLookUp, probes, rewrite } from './paths'
 import type { Ctx, Kind, Mode, Prefs } from './paths'
 
 const MODES: readonly Mode[] = ['segments', 'file', 'off']
@@ -37,25 +37,27 @@ const cache = new Map<string, { kind: Kind | null; at: number }>()
 /** A lookup that has not answered by then counts as missing, so a stalled mount never holds up a drawing. */
 const STAT_TIMEOUT_MS = 300
 
-async function kindOf($: EngineInterface, abs: string): Promise<Kind | null> {
+async function kindOf($: EngineInterface, abs: string, ctx: Ctx): Promise<Kind | null> {
   let timer: { cancel(): void } | undefined
   const late = new Promise<undefined>(done => {
     timer = $.clock.after(STAT_TIMEOUT_MS, () => done(undefined))
   })
-  const st = await Promise.race([$.fs.stat(abs).catch(() => undefined), late])
+  const st = await Promise.race([$.fs.stat(abs, { resolve: true }).catch(() => undefined), late])
   timer?.cancel()
-  return st?.kind === 'file' || st?.kind === 'dir' ? st.kind : null
+  // A link that leads out of the allowed roots is not linked either.
+  if (!st?.realPath || !mayLookUp(st.realPath, ctx)) return null
+  return st.kind === 'file' || st.kind === 'dir' ? st.kind : null
 }
 
 /** Stat what the text names and is not fresh in the cache. */
-async function lookUp($: EngineInterface, paths: string[], now: number): Promise<void> {
+async function lookUp($: EngineInterface, paths: string[], now: number, ctx: Ctx): Promise<void> {
   const stale = paths.filter(p => {
     const c = cache.get(p)
     return !c || now - c.at > (c.kind ? HIT_MS : MISS_MS)
   })
   await Promise.all(
     stale.slice(0, MAX_PROBES).map(async p => {
-      cache.set(p, { kind: await kindOf($, p), at: now })
+      cache.set(p, { kind: await kindOf($, p, ctx), at: now })
     }),
   )
   if (cache.size > MAX_CACHE) {
@@ -118,7 +120,7 @@ export const register: Register = (on, options) => {
     const ctx = await ctxOf($)
     const wanted = probes(text, ctx, prefs)
     if (wanted.length === 0) return next(e)
-    await lookUp($, wanted, await $.clock.now())
+    await lookUp($, wanted, await $.clock.now(), ctx)
     const out = rewrite(text, ctx, prefs, abs => cache.get(abs)?.kind ?? undefined)
     return out === text ? next(e) : next({ ...e, props: { ...e.props, text: out } })
   }).catch(($, e, next) => next(e)) // never in the way of a reply

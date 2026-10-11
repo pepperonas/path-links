@@ -36,16 +36,25 @@ export type Look = (abs: string) => Kind | undefined
 export type Found = { spelled: string; abs: string; kind: Kind; suffix: string }
 
 /**
- * Places where a mere stat can reach the network: automounters mount a share
- * on first access (macOS `/net`, `/Network`, `/home`; Linux autofs `/net`,
- * AFS). Paths under them are never looked up, so text in a reply can never
- * make the machine contact a host.
+ * Where a path may be looked up at all. A mere stat can reach the network
+ * through an automounter (macOS `/net`, `/Network`, `/home` = the firmlink
+ * `/System/Volumes/Data/home`; Linux autofs anywhere) or a mounted share
+ * (`/Volumes`, `/mnt`, `/media`), and reply text must never make the machine
+ * contact a host. A deny-list of such spellings is only best effort (aliases
+ * and case get around it), so this is an allow-list: the home folder, the
+ * working directory and the local system roots below, and nothing else.
  */
-const NETWORK_ROOTS = ['/net', '/network', '/home', '/afs', '/misc']
+const LOCAL_ROOTS = ['/users', '/etc', '/tmp', '/private/tmp', '/private/etc', '/var/folders', '/private/var/folders', '/usr', '/opt', '/applications', '/library', '/bin', '/sbin']
+/** Never, even under an allowed root. */
+const NEVER = ['/users/shared/.autofs', '/private/var/automount']
+const under = (a: string, r: string) => a === r || a.startsWith(`${r.replace(/\/$/, '')}/`)
+
 /** Compared without case: macOS file systems are case-insensitive, so `/NET/host` is `/net/host`. */
-export const isNetworkPath = (abs: string) => {
+export function mayLookUp(abs: string, ctx: Ctx): boolean {
   const a = abs.toLowerCase()
-  return NETWORK_ROOTS.some(r => a === r || a.startsWith(`${r}/`))
+  if (NEVER.some(r => under(a, r))) return false
+  const roots = [...LOCAL_ROOTS, ctx.home, ctx.cwd].filter((r): r is string => !!r).map(r => r.toLowerCase())
+  return roots.some(r => under(a, r))
 }
 
 /** Words a path in running text may stretch over, `My Drive` style. */
@@ -148,7 +157,7 @@ function tryCandidate(raw: string, ctx: Ctx, prefs: Prefs, look: Look): (Found &
   // below must judge the place the stat will reach. Such spellings are never looked up.
   if (s.split('/').includes('..')) return undefined
   const abs = resolvePath(s, ctx, prefs.relative)
-  if (!abs || abs === '/' || isNetworkPath(abs)) return undefined
+  if (!abs || abs === '/' || !mayLookUp(abs, ctx)) return undefined
   const kind = look(abs)
   if (!kind) return undefined
   return { spelled: s, abs, kind, suffix, used: s.length + suffix.length }
