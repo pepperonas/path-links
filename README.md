@@ -15,7 +15,7 @@
 <h3>👉 <code>/plugin marketplace add pepperonas/path-links</code> · <code>/plugin install path-links@pepperonas-path-links</code> — that's it.</h3>
 
 [![version](https://img.shields.io/badge/version-0.1.0-7B4DFF?style=for-the-badge&logo=anthropic&logoColor=white)](CHANGELOG.md)
-[![node tests](https://img.shields.io/badge/node%20tests-37-2E9E5B?style=for-the-badge&logo=nodedotjs&logoColor=white)](tests)
+[![node tests](https://img.shields.io/badge/node%20tests-38-2E9E5B?style=for-the-badge&logo=nodedotjs&logoColor=white)](tests)
 [![engine tests](https://img.shields.io/badge/engine%20tests-6-2E9E5B?style=for-the-badge&logo=anthropic&logoColor=white)](hooks)
 [![lines of code](https://img.shields.io/badge/lines%20of%20code-0.4k-4B6BDF?style=for-the-badge&logo=typescript&logoColor=white)](hooks)
 
@@ -175,7 +175,7 @@ Claude Code draws each block of an assistant reply through a `ui.render` event f
 
 Claude Code's own markdown renderer draws those as **OSC 8 hyperlinks** — the terminal shows the text unchanged and knows where each piece points. A click hands the `file://` URL to the system: a URL ending in `/` is a folder and opens in the file manager, anything else opens with its default app.
 
-1. **Scan** (`hooks/paths.ts`, pure) — the markdown is split into code blocks, inline code, links/URLs and running text. Path candidates start at `/`, `~/`, `./`, `../` or `word/`; in running text a candidate may stretch over up to ten space-separated words, in quotes or inline code it is taken whole. Trailing punctuation, an unopened `)` and a `:line` suffix are peeled off.
+1. **Scan** (`hooks/paths.ts`, pure) — the markdown is split into code blocks, inline code, links/URLs and running text. Path candidates start at `/`, `~/`, `./` or `word/`; in running text a candidate may stretch over up to ten space-separated words, in quotes or inline code it is taken whole. Trailing punctuation, an unopened `)` and a `:line` suffix are peeled off.
 2. **Look up** (`hooks/register.tsx`) — every candidate spelling is stat-ed through `$.fs.stat`, in parallel, at most 64 per drawing, with a cache. Whether a path is a file or a folder comes from that stat.
 3. **Rewrite** (`hooks/paths.ts`) — the same scanner runs again with the answers and picks the longest spelling that exists. Each segment becomes `[name](file://…)`; labels are markdown-escaped (`Bassfallen\_Wohnzimmer`), URLs percent-encoded (spaces, umlauts, `#`, `?`, parentheses).
 
@@ -185,7 +185,7 @@ The stored message is never changed — only its drawing — so copying, `ctrl+o
 
 - **No network.** The mod makes no request of any kind.
 - **No processes.** It never runs `open` itself; clicking is between you and your terminal.
-- **Never touches network locations.** Paths under automounter roots (`/net`, `/Network`, `/home`, `/afs`, `/misc`) are not looked up at all — a stat there could mount a share, and reply text must never make your machine contact a host. A lookup that takes longer than 300 ms counts as missing, so a stalled mount can't freeze the transcript.
+- **Never touches network locations.** Paths under automounter roots (`/net`, `/Network`, `/home`, `/afs`, `/misc`) are not looked up at all — a stat there could mount a share, and reply text must never make your machine contact a host. A lookup that takes longer than 300 ms counts as missing, so a stalled mount can't freeze the transcript. Spellings with a `..` segment are not looked up either (text and kernel can disagree about where they land through symlinks), and the check ignores case, as macOS file systems do.
 - **Reads only metadata.** It asks whether a path exists and whether it is a file or a folder — never a file's contents.
 - **No logs, no telemetry.** Its only stored value is your `/path-links` settings.
 

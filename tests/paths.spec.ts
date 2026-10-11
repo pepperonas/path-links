@@ -178,5 +178,11 @@ test('when a shorter spelling exists too, the longest existing one wins', () => 
 test('automounter roots are never looked up, so a reply cannot make the machine contact a host', () => {
   const asked = probes('see /net/fileserver/share/x.txt and /Network/Servers/h/y and /home/u/z and /afs/cell/a', CTX, DEFAULT_PREFS)
   assert.deepEqual(asked.filter(p => /^\/(net|Network|home|afs)(\/|$)/.test(p)), [])
+  const cased = probes('see /NET/host/x and /network/Servers/y and /Home/u/z', CTX, DEFAULT_PREFS)
+  assert.deepEqual(cased.filter(p => /^\/(net|network|home)(\/|$)/i.test(p)), [], 'case must not get around the check')
   assert.ok(probes('see /etc/hosts', CTX, DEFAULT_PREFS).includes('/etc/hosts'))
+})
+
+test('spellings with a .. segment are never looked up: text and kernel may disagree where they land', () => {
+  assert.deepEqual(probes('see /tmp/../net/host/x and ../x/y.md and /etc/hosts', CTX, DEFAULT_PREFS).filter(p => p !== '/etc/hosts'), [])
 })

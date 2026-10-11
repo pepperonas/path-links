@@ -41,8 +41,12 @@ export type Found = { spelled: string; abs: string; kind: Kind; suffix: string }
  * AFS). Paths under them are never looked up, so text in a reply can never
  * make the machine contact a host.
  */
-const NETWORK_ROOTS = ['/net', '/Network', '/home', '/afs', '/misc']
-export const isNetworkPath = (abs: string) => NETWORK_ROOTS.some(r => abs === r || abs.startsWith(`${r}/`))
+const NETWORK_ROOTS = ['/net', '/network', '/home', '/afs', '/misc']
+/** Compared without case: macOS file systems are case-insensitive, so `/NET/host` is `/net/host`. */
+export const isNetworkPath = (abs: string) => {
+  const a = abs.toLowerCase()
+  return NETWORK_ROOTS.some(r => a === r || a.startsWith(`${r}/`))
+}
 
 /** Words a path in running text may stretch over, `My Drive` style. */
 const MAX_WORDS = 10
@@ -139,6 +143,10 @@ function tryCandidate(raw: string, ctx: Ctx, prefs: Prefs, look: Look): (Found &
     s = s.slice(0, -suffix.length)
   }
   if (s.length < 2 || s.endsWith('/') && s.length < 3) return undefined
+  // `..` is folded by text here but by the kernel through symlinks (`/tmp`, `/var`, `/etc` are
+  // links on macOS): the two can disagree about where a path lands, and the network check
+  // below must judge the place the stat will reach. Such spellings are never looked up.
+  if (s.split('/').includes('..')) return undefined
   const abs = resolvePath(s, ctx, prefs.relative)
   if (!abs || abs === '/' || isNetworkPath(abs)) return undefined
   const kind = look(abs)
