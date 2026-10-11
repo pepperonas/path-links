@@ -16,3 +16,9 @@ All notable changes to path-links are documented here. The format follows
 - Fenced code blocks stay as written, with a `↳` line listing the paths they name.
 - `/path-links [segments|file|off|blocks on|off|relative on|off]`, remembered across sessions.
 - `userConfig`: `mode`, `codeBlocks`, `relative`.
+
+### Security
+
+- No path from a reply is ever `stat`-ed: lookups walk down from trusted roots (home, working
+  directory, local system folders) one directory listing at a time and never through a symlink,
+  so reply text cannot make the machine contact a network share or automounter.

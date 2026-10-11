@@ -1,7 +1,7 @@
 import type { EngineInterface, PluginOptions, Register } from 'claude-code'
 
-import { DEFAULT_PREFS, mayLookUp, probes, rewrite } from './paths'
-import type { Ctx, Kind, Mode, Prefs } from './paths'
+import { DEFAULT_PREFS, probes, rewrite, rootOf, walk } from './paths'
+import type { Ctx, Entry, Kind, Lister, Mode, Prefs } from './paths'
 
 const MODES: readonly Mode[] = ['segments', 'file', 'off']
 /** How long a lookup is trusted: a path that exists rarely vanishes, a missing one may appear soon. */
@@ -34,22 +34,49 @@ let prefs: Prefs = DEFAULT_PREFS
 let home: string | undefined
 const cache = new Map<string, { kind: Kind | null; at: number }>()
 
-/** A lookup that has not answered by then counts as missing, so a stalled mount never holds up a drawing. */
-const STAT_TIMEOUT_MS = 300
+/** A listing that has not answered by then counts as missing, so a stalled mount never holds up a drawing. */
+const LIST_TIMEOUT_MS = 300
+/** How long a directory listing is reused. */
+const LIST_MS = 5_000
 
-async function kindOf($: EngineInterface, abs: string, ctx: Ctx): Promise<Kind | null> {
+const listings = new Map<string, { entries: readonly Entry[] | undefined; at: number }>()
+const rootsReal = new Map<string, string | null>()
+
+async function timed<T>($: EngineInterface, p: Promise<T>): Promise<T | undefined> {
   let timer: { cancel(): void } | undefined
   const late = new Promise<undefined>(done => {
-    timer = $.clock.after(STAT_TIMEOUT_MS, () => done(undefined))
+    timer = $.clock.after(LIST_TIMEOUT_MS, () => done(undefined))
   })
-  const st = await Promise.race([$.fs.stat(abs, { resolve: true }).catch(() => undefined), late])
+  const r = await Promise.race([p.catch(() => undefined), late])
   timer?.cancel()
-  // A link that leads out of the allowed roots is not linked either.
-  if (!st?.realPath || !mayLookUp(st.realPath, ctx)) return null
-  return st.kind === 'file' || st.kind === 'dir' ? st.kind : null
+  return r
 }
 
-/** Stat what the text names and is not fresh in the cache. */
+/** Where a trusted root really lies (`/tmp` is `/private/tmp` on macOS); only roots are ever stat-ed. */
+async function realRoot($: EngineInterface, root: string): Promise<string | null> {
+  if (!rootsReal.has(root)) {
+    const st = await timed($, $.fs.stat(root, { resolve: true }))
+    rootsReal.set(root, st?.kind === 'dir' && st.realPath ? st.realPath : null)
+  }
+  return rootsReal.get(root) ?? null
+}
+
+async function kindOf($: EngineInterface, abs: string, ctx: Ctx, now: number): Promise<Kind | null> {
+  const root = rootOf(abs, ctx)
+  if (!root) return null
+  const real = await realRoot($, root)
+  if (!real) return null
+  const list: Lister = async dir => {
+    const c = listings.get(dir)
+    if (c && now - c.at <= LIST_MS) return c.entries
+    const entries = await timed($, $.fs.list(dir))
+    listings.set(dir, { entries, at: now })
+    return entries
+  }
+  return (await walk(abs, root, real, list)) ?? null
+}
+
+/** Look up what the text names and is not fresh in the cache. */
 async function lookUp($: EngineInterface, paths: string[], now: number, ctx: Ctx): Promise<void> {
   const stale = paths.filter(p => {
     const c = cache.get(p)
@@ -57,9 +84,10 @@ async function lookUp($: EngineInterface, paths: string[], now: number, ctx: Ctx
   })
   await Promise.all(
     stale.slice(0, MAX_PROBES).map(async p => {
-      cache.set(p, { kind: await kindOf($, p, ctx), at: now })
+      cache.set(p, { kind: await kindOf($, p, ctx, now), at: now })
     }),
   )
+  if (listings.size > MAX_CACHE) listings.clear()
   if (cache.size > MAX_CACHE) {
     for (const k of [...cache.keys()].slice(0, cache.size - MAX_CACHE)) cache.delete(k)
   }

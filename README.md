@@ -15,7 +15,7 @@
 <h3>👉 <code>/plugin marketplace add pepperonas/path-links</code> · <code>/plugin install path-links@pepperonas-path-links</code> — that's it.</h3>
 
 [![version](https://img.shields.io/badge/version-0.1.0-7B4DFF?style=for-the-badge&logo=anthropic&logoColor=white)](CHANGELOG.md)
-[![node tests](https://img.shields.io/badge/node%20tests-39-2E9E5B?style=for-the-badge&logo=nodedotjs&logoColor=white)](tests)
+[![node tests](https://img.shields.io/badge/node%20tests-43-2E9E5B?style=for-the-badge&logo=nodedotjs&logoColor=white)](tests)
 [![engine tests](https://img.shields.io/badge/engine%20tests-7-2E9E5B?style=for-the-badge&logo=anthropic&logoColor=white)](hooks)
 [![lines of code](https://img.shields.io/badge/lines%20of%20code-0.4k-4B6BDF?style=for-the-badge&logo=typescript&logoColor=white)](hooks)
 
@@ -176,7 +176,7 @@ Claude Code draws each block of an assistant reply through a `ui.render` event f
 Claude Code's own markdown renderer draws those as **OSC 8 hyperlinks** — the terminal shows the text unchanged and knows where each piece points. A click hands the `file://` URL to the system: a URL ending in `/` is a folder and opens in the file manager, anything else opens with its default app.
 
 1. **Scan** (`hooks/paths.ts`, pure) — the markdown is split into code blocks, inline code, links/URLs and running text. Path candidates start at `/`, `~/`, `./` or `word/`; in running text a candidate may stretch over up to ten space-separated words, in quotes or inline code it is taken whole. Trailing punctuation, an unopened `)` and a `:line` suffix are peeled off.
-2. **Look up** (`hooks/register.tsx`) — every candidate spelling is stat-ed through `$.fs.stat`, in parallel, at most 64 per drawing, with a cache. Whether a path is a file or a folder comes from that stat.
+2. **Look up** (`hooks/register.tsx` + `walk` in `hooks/paths.ts`) — every candidate is walked down from its trusted root with `$.fs.list`, one folder at a time, never through a symlink (see [Privacy](#-privacy)); at most 64 candidates per drawing, listings and answers cached. Whether a path is a file or a folder comes from the listing.
 3. **Rewrite** (`hooks/paths.ts`) — the same scanner runs again with the answers and picks the longest spelling that exists. Each segment becomes `[name](file://…)`; labels are markdown-escaped (`Bassfallen\_Wohnzimmer`), URLs percent-encoded (spaces, umlauts, `#`, `?`, parentheses).
 
 The stored message is never changed — only its drawing — so copying, `ctrl+o`, `/export` and the model's context all see the reply exactly as Claude wrote it.
@@ -185,7 +185,7 @@ The stored message is never changed — only its drawing — so copying, `ctrl+o
 
 - **No network.** The mod makes no request of any kind.
 - **No processes.** It never runs `open` itself; clicking is between you and your terminal.
-- **Never touches network locations.** A mere `stat` can reach the network through an automounter (`/net`, `/Network`, macOS's `/home`) or a mounted share, and reply text must never make your machine contact a host. So lookups use an **allow-list**: only paths in your home folder, the working directory and local system roots (`/etc`, `/tmp`, `/usr`, `/opt`, `/Applications`, `/Library`, …) are looked up; `/Volumes`, `/mnt`, `/media`, `/System/Volumes/…` and everything else never are. Case is ignored (macOS file systems do too), spellings with `..` are skipped, and a path whose symlink leads out of the allowed roots is not linked. A lookup slower than 300 ms counts as missing, so a stalled mount can't freeze the transcript. The one thing a mod can't rule out: a symlink *you* created inside your home folder that points at a network share is followed by the lookup, as by every other tool.
+- **Never touches network locations.** A lookup can reach the network through an automounter (`/net`, `/Network`, macOS's `/home`), a mounted share or a symlink to one — and reply text must never make your machine contact a host. So **no path from a reply is ever handed to `stat`**, which follows links. A lookup starts at a trusted root — your home folder, the working directory (unless it is `/`), or a local system folder (`/etc`, `/tmp`, `/usr`, `/opt`, `/Applications`, `/Library`, …) — and walks down **one directory listing at a time**; a listing names a symlink without following it, and a path that runs through a symlink is simply not linked. `/Volumes`, `/mnt`, `/media`, `/System/…` and everything outside the roots are never looked at. A listing slower than 300 ms counts as missing, so a stalled mount can't freeze the transcript.
 - **Reads only metadata.** It asks whether a path exists and whether it is a file or a folder — never a file's contents.
 - **No logs, no telemetry.** Its only stored value is your `/path-links` settings.
 
@@ -195,9 +195,9 @@ There are two suites, and the split is deliberate.
 
 **Node suite** — `tests/*.spec.ts`, plain `node:test`, no Claude Code needed; this is what CI runs. It drives the scanner against a pretend file system: paths with spaces in running text, the words after a path not swallowed, trailing punctuation and unbalanced brackets, `:line:col`, `~` and relative spellings, missing paths left exactly as written, links/autolinks/URLs untouched, inline code with a path vs. with a command, fenced blocks unchanged with the `↳` line (and none while a fence is still streaming), dedupe and the three-path cap, quoted paths, `file` and `off` modes, URL encoding (spaces, umlauts, `#?()`), markdown escaping — and that `rewrite` never looks up a path `probes` did not name. Plus **drift guards** that hold this README to the code: the version everywhere, the test-count badges, every `/config` field and its default, every command, every image, the marketplace entry and the install commands.
 
-**Engine suite** — `hooks/*.test.tsx`, run by `claude plugin test .` against Claude Code's own engine: a reply is drawn on the `terminal` *and* `desktop` surfaces with one link per folder plus the file, a reply without existing paths is drawn exactly as written, relative paths resolve against the working directory, `/path-links off` and back, and a second drawing stats nothing again.
+**Engine suite** — `hooks/*.test.tsx`, run by `claude plugin test .` against Claude Code's own engine: a reply is drawn on the `terminal` *and* `desktop` surfaces with one link per folder plus the file, a reply without existing paths is drawn exactly as written, relative paths resolve against the working directory, a path through a symlink is not linked, `/path-links off` and back, and a second drawing lists nothing again while only trusted roots are ever stat-ed.
 
-**Every guarded behaviour is mutated once.** A test that has never been seen red is not an assurance. So each one gets its bug put back — the existence check skipped, the longest-match order reversed, the trailing-punctuation strip removed, the folder slash dropped from the URL, the label escaping removed, fenced blocks rewritten, URLs rewritten, the cache bypassed — and the suite must go red.
+**Every guarded behaviour is mutated once.** A test that has never been seen red is not an assurance. So each one gets its bug put back — the existence check skipped, the longest-match order reversed, the trailing-punctuation strip removed, the folder slash dropped from the URL, the label escaping removed, fenced blocks rewritten, URLs rewritten, the cache bypassed, the walk allowed through a symlink, `/` accepted as a working-directory root, a reply's path stat-ed directly — and the suite must go red.
 
 ```bash
 npm install              # dev tools only; the mod itself has no dependencies

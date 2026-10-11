@@ -1,8 +1,8 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 
-import { DEFAULT_PREFS, escapeLabel, fileUrl, linkPath, probes, resolvePath, rewrite } from '../hooks/paths.ts'
-import type { Ctx, Kind, Prefs } from '../hooks/paths.ts'
+import { DEFAULT_PREFS, escapeLabel, fileUrl, linkPath, probes, resolvePath, rewrite, rootOf, walk } from '../hooks/paths.ts'
+import type { Ctx, Entry, Kind, Prefs } from '../hooks/paths.ts'
 
 const CTX: Ctx = { home: '/Users/me', cwd: '/Users/me/src/shop' }
 const DRIVE = '/Users/me/My Drive/docs/Bassfallen_Wohnzimmer'
@@ -196,4 +196,51 @@ test('only the home folder, the working directory and local system roots are loo
   const ok = probes('see /etc/hosts and /Users/me/a.md and /usr/local/x and /tmp/y', CTX, DEFAULT_PREFS)
   for (const p of ['/etc/hosts', '/Users/me/a.md', '/usr/local/x', '/tmp/y']) assert.ok(ok.includes(p), p)
   assert.ok(probes('see /srv/app/x.md', { ...CTX, cwd: '/srv/app' }, DEFAULT_PREFS).includes('/srv/app/x.md'), 'the working directory is allowed wherever it is')
+})
+
+test('the working directory / allows nothing extra; the deepest root wins', () => {
+  assert.equal(rootOf('/srv/x', { ...CTX, cwd: '/' }), undefined)
+  assert.equal(rootOf('/Users/me/src/shop/a', CTX), '/Users/me/src/shop')
+  assert.equal(rootOf('/USERS/me/x', CTX), '/Users/me')
+  assert.equal(rootOf('/Users/Shared/.autofs/x', CTX), undefined)
+})
+
+const TREE: Record<string, Entry[]> = {
+  '/Users': [{ name: 'me', kind: 'dir', isLink: false }],
+  '/Users/me': [
+    { name: 'docs', kind: 'dir', isLink: false },
+    { name: 'share', kind: 'other', isLink: true },
+    // a host that reports where a link leads must not get it followed either
+    { name: 'nas', kind: 'dir', isLink: true },
+    { name: 'a.md', kind: 'file', isLink: false },
+  ],
+  '/Users/me/docs': [{ name: 'Plan.md', kind: 'file', isLink: false }],
+}
+const lister = (seen: string[] = []) => async (dir: string) => {
+  seen.push(dir)
+  return TREE[dir]
+}
+
+test('walk finds files and folders one listing at a time', async () => {
+  assert.equal(await walk('/Users/me/docs/Plan.md', '/Users', '/Users', lister()), 'file')
+  assert.equal(await walk('/Users/me/docs', '/Users', '/Users', lister()), 'dir')
+  assert.equal(await walk('/Users/me', '/Users/me', '/Users/me', lister()), 'dir')
+  assert.equal(await walk('/Users/me/docs/plan.md', '/Users', '/Users', lister()), 'file', 'case-insensitive like the file system')
+  assert.equal(await walk('/Users/me/nope.md', '/Users', '/Users', lister()), undefined)
+  assert.equal(await walk('/Users/me/a.md/x', '/Users', '/Users', lister()), undefined, 'a file is not a folder')
+})
+
+test('walk never goes through a symlink, so a link to a share is never touched', async () => {
+  const seen: string[] = []
+  assert.equal(await walk('/Users/me/share/x/y.txt', '/Users', '/Users', lister(seen)), undefined)
+  assert.equal(await walk('/Users/me/share', '/Users', '/Users', lister(seen)), undefined)
+  assert.equal(await walk('/Users/me/nas/x/y.txt', '/Users', '/Users', lister(seen)), undefined)
+  assert.equal(await walk('/Users/me/nas', '/Users', '/Users', lister(seen)), undefined)
+  assert.ok(!seen.some(d => d.startsWith('/Users/me/share') || d.startsWith('/Users/me/nas')), `listed ${seen.join(', ')}`)
+})
+
+test('walk starts at the real place of the root (/tmp is /private/tmp on macOS)', async () => {
+  const seen: string[] = []
+  await walk('/tmp/a/b', '/tmp', '/private/tmp', async d => (seen.push(d), d === '/private/tmp' ? [{ name: 'a', kind: 'dir', isLink: false }] : []))
+  assert.deepEqual(seen, ['/private/tmp', '/private/tmp/a'])
 })

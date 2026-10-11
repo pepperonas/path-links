@@ -36,25 +36,69 @@ export type Look = (abs: string) => Kind | undefined
 export type Found = { spelled: string; abs: string; kind: Kind; suffix: string }
 
 /**
- * Where a path may be looked up at all. A mere stat can reach the network
+ * Where a path may be looked up at all. A lookup can reach the network
  * through an automounter (macOS `/net`, `/Network`, `/home` = the firmlink
- * `/System/Volumes/Data/home`; Linux autofs anywhere) or a mounted share
- * (`/Volumes`, `/mnt`, `/media`), and reply text must never make the machine
- * contact a host. A deny-list of such spellings is only best effort (aliases
- * and case get around it), so this is an allow-list: the home folder, the
- * working directory and the local system roots below, and nothing else.
+ * `/System/Volumes/Data/home`; Linux autofs anywhere), a mounted share or a
+ * symlink to one, and reply text must never make the machine contact a host.
+ *
+ * So no path from the text is ever handed to `stat`, which follows links.
+ * A lookup starts at one of these trusted roots (the home folder, the
+ * working directory, local system folders) and walks down with directory
+ * listings, which name a link without following it (`walk`). A path that
+ * runs through a symlink is not linked.
  */
-const LOCAL_ROOTS = ['/users', '/etc', '/tmp', '/private/tmp', '/private/etc', '/var/folders', '/private/var/folders', '/usr', '/opt', '/applications', '/library', '/bin', '/sbin']
+export const LOCAL_ROOTS = ['/Users', '/etc', '/tmp', '/private/tmp', '/private/etc', '/var/folders', '/private/var/folders', '/usr', '/opt', '/Applications', '/Library', '/bin', '/sbin']
 /** Never, even under an allowed root. */
 const NEVER = ['/users/shared/.autofs', '/private/var/automount']
 const under = (a: string, r: string) => a === r || a.startsWith(`${r.replace(/\/$/, '')}/`)
 
-/** Compared without case: macOS file systems are case-insensitive, so `/NET/host` is `/net/host`. */
-export function mayLookUp(abs: string, ctx: Ctx): boolean {
+/**
+ * The trusted root a path lies under, the deepest one; compared without case
+ * (macOS file systems ignore it). The working directory counts only when it
+ * is not `/` itself, else it would allow everything.
+ */
+export function rootOf(abs: string, ctx: Ctx): string | undefined {
   const a = abs.toLowerCase()
-  if (NEVER.some(r => under(a, r))) return false
-  const roots = [...LOCAL_ROOTS, ctx.home, ctx.cwd].filter((r): r is string => !!r).map(r => r.toLowerCase())
-  return roots.some(r => under(a, r))
+  if (NEVER.some(r => under(a, r))) return undefined
+  const roots = [...LOCAL_ROOTS, ctx.home, ctx.cwd]
+    .filter((r): r is string => !!r && r.startsWith('/') && r !== '/')
+    .map(r => r.replace(/\/+$/, ''))
+  return roots.filter(r => under(a, r.toLowerCase())).sort((x, y) => y.length - x.length)[0]
+}
+
+export const mayLookUp = (abs: string, ctx: Ctx) => rootOf(abs, ctx) !== undefined
+
+/** One entry of a directory listing: the entry itself, a link not followed. */
+export type Entry = { name: string; kind: 'file' | 'dir' | 'other'; isLink: boolean }
+/** Lists a directory by its real path; undefined when it can't be listed. */
+export type Lister = (dir: string) => Promise<readonly Entry[] | undefined>
+
+/**
+ * What `abs` is, found by walking down from `root` (whose real path is
+ * `rootReal`) one listing at a time: undefined when a component is missing,
+ * is a link, or is something other than a folder on the way. No link is
+ * ever followed, so where the walk goes is where the text says, below a
+ * place that was trusted to begin with.
+ */
+export async function walk(abs: string, root: string, rootReal: string, list: Lister): Promise<Kind | undefined> {
+  const rest = abs.slice(root.length).split('/').filter(Boolean)
+  let dir = rootReal.replace(/\/+$/, '') || '/'
+  for (let i = 0; i < rest.length; i++) {
+    const entries = await list(dir)
+    if (!entries) return undefined
+    const want = rest[i]!
+    let e = entries.find(x => x.name === want)
+    if (!e) {
+      const ci = entries.filter(x => x.name.toLowerCase() === want.toLowerCase())
+      if (ci.length === 1) e = ci[0]
+    }
+    if (!e || e.isLink) return undefined
+    const last = i === rest.length - 1
+    if (last) return e.kind === 'file' ? 'file' : e.kind === 'dir' ? 'dir' : undefined
+    if (e.kind !== 'dir') return undefined
+    dir = `${dir === '/' ? '' : dir}/${e.name}`
+  }
+  return 'dir'
 }
 
 /** Words a path in running text may stretch over, `My Drive` style. */

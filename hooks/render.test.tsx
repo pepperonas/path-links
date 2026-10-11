@@ -9,11 +9,29 @@ const FS: Record<string, 'file' | 'dir'> = {
   '/Users/me/src/shop/hooks/register.tsx': 'file',
 }
 
+/** Children of a folder in the pretend file system, as `$.fs.list` names them. */
+function children(dir: string, links: Set<string>) {
+  const names = new Map<string, 'file' | 'dir'>()
+  for (const [p, kind] of Object.entries(FS)) {
+    const parts = p.split('/')
+    for (let i = 1; i < parts.length; i++) {
+      const parent = parts.slice(0, i).join('/') || '/'
+      if (parent === dir) names.set(parts[i]!, i === parts.length - 1 ? kind : 'dir')
+    }
+  }
+  return [...names].map(([name, kind]) => {
+    const full = `${dir === '/' ? '' : dir}/${name}`
+    const isLink = links.has(full)
+    return { name, kind: isLink ? 'other' : kind, size: 0, mtimeMs: 0, isLink }
+  })
+}
+
 /** Stand-in for the engine beneath the plugin: draws the reply's text as markdown. */
-function engine(on: any, real = (p: string) => p) {
+function engine(on: any, links = new Set<string>()) {
   mock.clock(on)
   mock.store(on)
   const stats: string[] = []
+  const lists: string[] = []
   on('ui.render', ($: any, e: any) => {
     const { Markdown } = $.ui.resolve(e)
     return <Markdown text={e.props.text} />
@@ -24,11 +42,13 @@ function engine(on: any, real = (p: string) => p) {
   on('command.register', () => ({ value: undefined }))
   on('fs.stat', (_$: any, e: any) => {
     stats.push(e.path)
-    const kind = FS[e.path]
-    if (!kind) throw new Error(`ENOENT: ${e.path}`)
-    return { value: { kind, size: 0, mtimeMs: 0, isLink: false, realPath: real(e.path) } }
+    return { value: { kind: 'dir', size: 0, mtimeMs: 0, isLink: false, realPath: e.path } }
   })
-  return { stats }
+  on('fs.list', (_$: any, e: any) => {
+    lists.push(e.path)
+    return { value: children(e.path, links) }
+  })
+  return { stats, lists }
 }
 
 const start = ($: any) => $.session.start({ cwd: '/Users/me/src/shop', surface: 'terminal', isInteractive: true })
@@ -70,19 +90,21 @@ test('/path-links off turns the links off, segments brings them back', async ($,
   expect(await drawn(await reply($, FILE, 'terminal'))).toContain('file://')
 })
 
-test('a path whose link leads out of the allowed roots is not linked', async ($, on) => {
-  engine(on, p => `/Volumes/share${p}`)
+test('a path that runs through a symlink is not linked: no link is ever followed', async ($, on) => {
+  engine(on, new Set(['/Users/me/src/shop/hooks']))
   await start($)
   const text = 'see hooks/register.tsx'
   expect(await drawn(await reply($, text, 'terminal'))).toBe(text)
 })
 
-test('a second drawing of the same reply stats nothing again', async ($, on) => {
-  const { stats } = engine(on)
+test('a second drawing lists nothing again, and only roots are ever stat-ed', async ($, on) => {
+  const { stats, lists } = engine(on)
   await start($)
   await reply($, FILE, 'terminal')
-  const first = stats.length
+  const first = lists.length
   expect(first).toBeGreaterThan(0)
   await reply($, FILE, 'terminal')
-  expect(stats.length).toBe(first)
+  expect(lists.length).toBe(first)
+  // only trusted roots are ever stat-ed, never a path from the reply
+  for (const p of stats) expect(['/Users', '/Users/me', '/Users/me/src/shop'].includes(p)).toBe(true)
 })
