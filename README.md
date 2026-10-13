@@ -59,9 +59,9 @@
 
 ## 📸 Screenshots
 
-<img src="docs/hero.png" alt="A Claude Code reply with a long path; the folder Bassfallen_Wohnzimmer is hovered and a card says it opens in Finder." width="100%">
+<img src="docs/hero.png" alt="A Claude Code reply with a long path; the folder Projekt_Demo is hovered and a card says it opens in Finder." width="100%">
 
-<sub>Hover any segment: <code>Bassfallen_Wohnzimmer</code> opens that folder, not the file next to it.</sub>
+<sub>Hover any segment: <code>Projekt_Demo</code> opens that folder, not the file next to it.</sub>
 
 <img src="docs/before-after.png" alt="Left: the path as plain text. Right: the same path with every folder and the file underlined as links." width="100%">
 
@@ -77,7 +77,7 @@
 
 ## ✨ Features
 
-- **One link per folder** — click `docs` to open `docs`, click `Bassfallen_Wohnzimmer` to open that folder, click the file name to open the file. Folders open in Finder (or your Linux file manager), files in their default app.
+- **One link per folder** — click `docs` to open `docs`, click `Projekt_Demo` to open that folder, click the file name to open the file. Folders open in Finder (or your Linux file manager), files in their default app.
 - **Paths with spaces** — `My Drive`, `Main St. 24`: running text is matched word by word and the longest spelling that **exists** wins, so the sentence after a path is never swallowed.
 - **Only real paths** — every candidate is checked against the file system first. Nothing that doesn't exist becomes a link, so there are no dead links and `and/or` stays text.
 - **Absolute, `~/` and relative** — `hooks/register.tsx` resolves against the session's working directory; the spelling you see is kept as written.
@@ -177,7 +177,7 @@ Claude Code's own markdown renderer draws those as **OSC 8 hyperlinks** — the 
 
 1. **Scan** (`hooks/paths.ts`, pure) — the markdown is split into code blocks, inline code, links/URLs and running text. Path candidates start at `/`, `~/`, `./` or `word/`; in running text a candidate may stretch over up to ten space-separated words, in quotes or inline code it is taken whole. Trailing punctuation, an unopened `)` and a `:line` suffix are peeled off.
 2. **Look up** (`hooks/register.tsx` + `walk` in `hooks/paths.ts`) — every candidate is walked down from its trusted root with `$.fs.list`, one folder at a time, never through a symlink (see [Privacy](#-privacy)); at most 64 candidates per drawing, listings and answers cached. Whether a path is a file or a folder comes from the listing.
-3. **Rewrite** (`hooks/paths.ts`) — the same scanner runs again with the answers and picks the longest spelling that exists. Each segment becomes `[name](file://…)`; labels are markdown-escaped (`Bassfallen\_Wohnzimmer`), URLs percent-encoded (spaces, umlauts, `#`, `?`, parentheses).
+3. **Rewrite** (`hooks/paths.ts`) — the same scanner runs again with the answers and picks the longest spelling that exists. Each segment becomes `[name](file://…)`; labels are markdown-escaped (`Projekt\_Demo`), URLs percent-encoded (spaces, umlauts, `#`, `?`, parentheses).
 
 The stored message is never changed — only its drawing — so copying, `ctrl+o`, `/export` and the model's context all see the reply exactly as Claude wrote it.
 

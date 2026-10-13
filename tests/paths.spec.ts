@@ -5,15 +5,15 @@ import { DEFAULT_PREFS, escapeLabel, fileUrl, linkPath, probes, resolvePath, rew
 import type { Ctx, Entry, Kind, Prefs } from '../hooks/paths.ts'
 
 const CTX: Ctx = { home: '/Users/me', cwd: '/Users/me/src/shop' }
-const DRIVE = '/Users/me/My Drive/docs/Bassfallen_Wohnzimmer'
+const DRIVE = '/Users/me/My Drive/docs/Projekt_Demo'
 const FS: Record<string, Kind> = {
   '/Users': 'dir',
   '/Users/me': 'dir',
   '/Users/me/My Drive': 'dir',
   '/Users/me/My Drive/docs': 'dir',
   [DRIVE]: 'dir',
-  [`${DRIVE}/Bassfallen-Rechner.html`]: 'file',
-  [`${DRIVE}/2026-10_Plan_Bassfallen.md`]: 'file',
+  [`${DRIVE}/Rechner-Demo.html`]: 'file',
+  [`${DRIVE}/2026-10_Plan_Demo.md`]: 'file',
   '/Users/me/src/shop': 'dir',
   '/Users/me/src/shop/hooks': 'dir',
   '/Users/me/src/shop/hooks/register.tsx': 'file',
@@ -43,29 +43,29 @@ test('fileUrl encodes spaces, umlauts and the characters a URL would misread; fo
 })
 
 test('escapeLabel keeps markdown from reading underscores and brackets as markup', () => {
-  assert.equal(escapeLabel('Bassfallen_Wohnzimmer'), 'Bassfallen\\_Wohnzimmer')
+  assert.equal(escapeLabel('Projekt_Demo'), 'Projekt\\_Demo')
   assert.equal(escapeLabel('[a]*b*'), '\\[a\\]\\*b\\*')
 })
 
 test('a path with spaces in running text: every folder and the file a link of its own', () => {
-  const out = run(`Der Rechner liegt hier:\n\n${DRIVE}/Bassfallen-Rechner.html\n\nÖffnen per Doppelklick.`)
+  const out = run(`Der Rechner liegt hier:\n\n${DRIVE}/Rechner-Demo.html\n\nÖffnen per Doppelklick.`)
   assert.deepEqual(hrefs(out), [
     'file:///Users/',
     'file:///Users/me/',
     'file:///Users/me/My Drive/',
     'file:///Users/me/My Drive/docs/',
     `file://${DRIVE}/`,
-    `file://${DRIVE}/Bassfallen-Rechner.html`,
+    `file://${DRIVE}/Rechner-Demo.html`,
   ])
   assert.ok(out.includes('[My Drive](file:///Users/me/My%20Drive/)'))
-  assert.ok(out.includes('[Bassfallen-Rechner.html]('))
+  assert.ok(out.includes('[Rechner-Demo.html]('))
   assert.ok(out.startsWith('Der Rechner liegt hier:\n\n/[Users]('), 'the root slash stays plain text')
   assert.ok(out.endsWith('\n\nÖffnen per Doppelklick.'))
 })
 
 test('the words after a path are not swallowed into it', () => {
-  const out = run(`Open ${DRIVE}/Bassfallen-Rechner.html in the browser.`)
-  assert.ok(out.endsWith('Bassfallen-Rechner.html) in the browser.'))
+  const out = run(`Open ${DRIVE}/Rechner-Demo.html in the browser.`)
+  assert.ok(out.endsWith('Rechner-Demo.html) in the browser.'))
 })
 
 test('trailing punctuation and a closing bracket the path did not open stay outside', () => {
@@ -102,20 +102,20 @@ test('inline code holding just a path becomes the links, without the backticks',
 })
 
 test('inline code holding a command stays code; its paths follow on a line of their own', () => {
-  const out = run(`run \`open "${DRIVE}/Bassfallen-Rechner.html"\` to open it`)
+  const out = run(`run \`open "${DRIVE}/Rechner-Demo.html"\` to open it`)
   const [first, second] = out.split('\n')
-  assert.equal(first, `run \`open "${DRIVE}/Bassfallen-Rechner.html"\` to open it  `)
+  assert.equal(first, `run \`open "${DRIVE}/Rechner-Demo.html"\` to open it  `)
   assert.ok(second!.startsWith('↳ /[Users]('))
-  assert.ok(second!.endsWith('[Bassfallen-Rechner.html](file:///Users/me/My%20Drive/docs/Bassfallen_Wohnzimmer/Bassfallen-Rechner.html)'))
+  assert.ok(second!.endsWith('[Rechner-Demo.html](file:///Users/me/My%20Drive/docs/Projekt_Demo/Rechner-Demo.html)'))
 })
 
 test('a fenced block stays copyable as written; the paths it names follow it', () => {
-  const block = ['```', `! open "${DRIVE}/Bassfallen-Rechner.html"`, '```']
+  const block = ['```', `! open "${DRIVE}/Rechner-Demo.html"`, '```']
   const out = run(block.join('\n')).split('\n')
   assert.deepEqual(out.slice(0, 3), block)
   assert.equal(out[3], '')
   assert.ok(out[4]!.startsWith('↳ '))
-  assert.equal(hrefs(out[4]!).at(-1), `file://${DRIVE}/Bassfallen-Rechner.html`)
+  assert.equal(hrefs(out[4]!).at(-1), `file://${DRIVE}/Rechner-Demo.html`)
   assert.deepEqual(run(block.join('\n'), { codeBlocks: false }).split('\n'), block)
 })
 
@@ -131,7 +131,7 @@ test('the line under a block lists each path once, three at most', () => {
 })
 
 test('a quoted path is taken whole, spaces and all', () => {
-  const out = run(`"${DRIVE}/Bassfallen-Rechner.html"`)
+  const out = run(`"${DRIVE}/Rechner-Demo.html"`)
   assert.equal(hrefs(out).length, 6)
   assert.ok(out.startsWith('"/[Users]') && out.endsWith(')"'))
 })
@@ -151,7 +151,7 @@ test('a folder path ending in / links the folder', () => {
 
 test('probes names every path rewrite would look up, and rewrite asks for nothing else', () => {
   const texts = [
-    `Open ${DRIVE}/Bassfallen-Rechner.html, then /etc/hosts.`,
+    `Open ${DRIVE}/Rechner-Demo.html, then /etc/hosts.`,
     'a/b.html,/etc/hosts and `cat ~/notes.md`',
     ['```', 'open "/etc/hosts"', '```'].join('\n'),
   ]

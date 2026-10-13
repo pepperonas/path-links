@@ -21,12 +21,12 @@ const ROOT = resolve(import.meta.dirname, '..')
 const DOCS = join(ROOT, 'docs')
 const TMP = join(DOCS, '.render')
 
-const DIR = '/Users/me/My Drive/docs/apartment/Bassfallen_Wohnzimmer'
-const FILE = `${DIR}/Bassfallen-Rechner.html`
+const DIR = '/Users/me/My Drive/docs/Projekt_Demo'
+const FILE = `${DIR}/Rechner-Demo.html`
 const CTX: Ctx = { home: '/Users/me', cwd: '/Users/me/src/shop' }
 const FS: Record<string, Kind> = {
   [FILE]: 'file',
-  [`${DIR}/2026-10_Plan_Bassfallen.md`]: 'file',
+  [`${DIR}/2026-10_Plan_Demo.md`]: 'file',
   '/Users/me/src/shop/src/routes/login.ts': 'file',
 }
 const look = (abs: string) => FS[abs]
@@ -113,7 +113,7 @@ function transcript(asked: string, md: string, hover = -1, withPrompt = true) {
 }
 
 const REPLY = `Der Rechner liegt hier:\n\n${FILE}\n\nÖffnen per Doppelklick im Finder, er läuft offline im Browser.`
-const ASKED = 'wo liegt der Bassfallen-Rechner?'
+const ASKED = 'wo liegt der Rechner-Demo?'
 
 async function main() {
   rmSync(TMP, { recursive: true, force: true })
@@ -170,7 +170,7 @@ async function main() {
 
   // Social preview, 1280×640.
   const social = await browser.newPage({ viewport: { width: 1280, height: 640 }, deviceScaleFactor: 1 })
-  const crumb = mdToHtml(rewrite('/Users/me/My Drive/docs/apartment/Bassfallen_Wohnzimmer/Bassfallen-Rechner.html', CTX, DEFAULT_PREFS, look), 4)
+  const crumb = mdToHtml(rewrite('/Users/me/My Drive/docs/Projekt_Demo/Rechner-Demo.html', CTX, DEFAULT_PREFS, look), 4)
   await social.setContent(`<style>${CSS}
 body{width:1280px;height:640px;overflow:hidden;margin:0;padding:64px 72px 64px;font-family:-apple-system,"SF Pro Display","Segoe UI",sans-serif;color:#e6edf3;
 background:radial-gradient(1000px 500px at 85% 0%,#1f6feb40,transparent),radial-gradient(800px 500px at 0% 100%,#d9775730,transparent),#0d1117;display:flex;flex-direction:column}

@@ -1,7 +1,7 @@
 import { expect, mock, test } from 'claude-code/testing'
 
-const DRIVE = '/Users/me/My Drive/docs/Bassfallen_Wohnzimmer'
-const FILE = `${DRIVE}/Bassfallen-Rechner.html`
+const DRIVE = '/Users/me/My Drive/docs/Projekt_Demo'
+const FILE = `${DRIVE}/Rechner-Demo.html`
 const FS: Record<string, 'file' | 'dir'> = {
   '/Users/me/My Drive/docs': 'dir',
   [DRIVE]: 'dir',
@@ -62,8 +62,8 @@ for (const surface of ['terminal', 'desktop'] as const) {
     await start($)
     const md = await drawn(await reply($, `Der Rechner liegt hier:\n\n${FILE}`, surface))
     expect(md).toContain('[My Drive](file:///Users/me/My%20Drive/)')
-    expect(md).toContain('[Bassfallen\\_Wohnzimmer](file:///Users/me/My%20Drive/docs/Bassfallen_Wohnzimmer/)')
-    expect(md).toContain('[Bassfallen-Rechner.html](file:///Users/me/My%20Drive/docs/Bassfallen_Wohnzimmer/Bassfallen-Rechner.html)')
+    expect(md).toContain('[Projekt\\_Demo](file:///Users/me/My%20Drive/docs/Projekt_Demo/)')
+    expect(md).toContain('[Rechner-Demo.html](file:///Users/me/My%20Drive/docs/Projekt_Demo/Rechner-Demo.html)')
   })
 }
 
